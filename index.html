@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <title>Síň megalovců 3D</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+      background: #000;
+      color: #fff;
+    }
+    #overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.8);
+      color: #fff;
+      z-index: 10;
+      cursor: pointer;
+      flex-direction: column;
+      text-align: center;
+    }
+    #info {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 5;
+      background: rgba(0,0,0,0.5);
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+<div id="overlay">
+  <h1>Síň megalovců 3D</h1>
+  <p>Klikni pro vstup, ovládání: WASD + myš, mezerník = skok</p>
+</div>
+<div id="info">
+  WASD = pohyb, myš = rozhlížení, Esc = kurzor
+</div>
+
+<script type="module">
+  import * as THREE from 'https://unpkg.com/three@0.161.0/build/three.module.js';
+  import { PointerLockControls } from 'https://unpkg.com/three@0.161.0/examples/jsm/controls/PointerLockControls.js';
+
+  // ===== ZÁKLAD SCÉNY =====
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x050509);
+
+  const camera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+  );
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  document.body.appendChild(renderer.domElement);
+
+  // ===== SVĚTLA =====
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.25);
+  scene.add(ambientLight);
+
+  const spotLight = new THREE.SpotLight(0xffffff, 1.2);
+  spotLight.position.set(0, 10, 0);
+  spotLight.angle = Math.PI / 4;
+  spotLight.penumbra = 0.3;
+  spotLight.decay = 1;
+  spotLight.distance = 50;
+  spotLight.castShadow = true;
+  scene.add(spotLight);
+
+  // ===== MÍSTNOST (JEDNODUCHÁ HALA) =====
+  const roomWidth = 20;
+  const roomDepth = 30;
+  const roomHeight = 6;
+
+  const wallMaterial = new THREE.MeshStandardMaterial({
+    color: 0x222233,
+    metalness: 0.1,
+    roughness: 0.8
+  });
+
+  const floorMaterial = new THREE.MeshStandardMaterial({
+    color: 0x111111,
+    metalness: 0.2,
+    roughness: 0.9
+  });
+
+  // Podlaha
+  const floorGeo = new THREE.PlaneGeometry(roomWidth, roomDepth);
+  const floor = new THREE.Mesh(floorGeo, floorMaterial);
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  scene.add(floor);
+
+  // Strop
+  const ceilingGeo = new THREE.PlaneGeometry(roomWidth, roomDepth);
+  const ceiling = new THREE.Mesh(ceilingGeo, wallMaterial);
+  ceiling.rotation.x = Math.PI / 2;
+  ceiling.position.y = roomHeight;
+  scene.add(ceiling);
+
+  // Stěny
+  function createWall(width, height, depth, x, y, z, rotY = 0) {
+    const geo = new THREE.BoxGeometry(width, height, depth);
+    const mesh = new THREE.Mesh(geo, wallMaterial);
+    mesh.position.set(x, y, z);
+    mesh.rotation.y = rotY;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+    colliders.push(mesh);
+    return mesh;
+  }
+
+  const colliders = [];
+
+  // Zadní stěna
+  createWall(roomWidth, roomHeight, 0.5, 0, roomHeight / 2, -roomDepth / 2);
+  // Přední stěna
+  createWall(roomWidth, roomHeight, 0.5, 0, roomHeight / 2, roomDepth / 2);
+  // Levá stěna
+  createWall(roomDepth, roomHeight, 0.5, -roomWidth / 2, roomHeight / 2, 0, Math.PI / 2);
+  // Pravá stěna
+  createWall(roomDepth, roomHeight, 0.5, roomWidth / 2, roomHeight / 2, 0, Math.PI / 2);
+
+  // ===== „DATA Z NETU“ – MOCK ŽEBŘÍČKU =====
+  const leaderboard = [
+    { name: 'MegaHunterCZ', score: 98765 },
+    { name: 'ShadowWolf', score: 87654 },
+    { name: 'PixelSlayer', score: 76543 },
+    { name: 'NoScopeNinja', score: 65432 },
+    { name: 'LuckyShot', score: 54321 }
+  ];
+
+  // ===== PANELY NA ZDI (ŽEBŘÍČEK) =====
+  const panelMaterial = new THREE.MeshStandardMaterial({
+    color: 0x333344,
+    metalness: 0.3,
+    roughness: 0.6
+  });
+
+  const textCanvasCache = {};
+
+  function createTextTexture(text, width = 512, height = 256) {
+    const key = text;
+    if (textCanvasCache[key]) return textCanvasCache[key];
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#111122';
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 40px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+
+    const lines = text.split('\n');
+    const lineHeight = 48;
+    let y = 30;
+    for (const line of lines) {
+      ctx.fillText(line, width / 2, y);
+      y += lineHeight;
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    textCanvasCache[key] = texture;
+    return texture;
+  }
+
+  function createLeaderboardPanel(data, x, y, z, rotY) {
+    const panelGeo = new THREE.PlaneGeometry(6, 3);
+    const textLines = [
+      'Síň megalovců',
+      '-----------------',
+      ...data.map((d, i) => `${i + 1}. ${d.name} — ${d.score}`)
+    ];
+    const texture = createTextTexture(textLines.join('\n'));
+    const mat = new THREE.MeshStandardMaterial({
+      map: texture,
+      metalness: 0.2,
+      roughness: 0.7
+    });
+
+    const panel = new THREE.Mesh(panelGeo, mat);
+    panel.position.set(x, y, z);
+    panel.rotation.y = rotY;
+    panel.castShadow = true;
+    panel.receiveShadow = true;
+    scene.add(panel);
+    return panel;
+  }
+
+  // Panel na zadní stěně
+  createLeaderboardPanel(
+    leaderboard,
+    0,
+    3,
+    -roomDepth / 2 + 0.26,
+    0
+  );
+
+  // Další panely – třeba „Top headshots“, „Nejdelší série“
+  const extra1 = createTextTexture(
+    'Top headshots\n-----------------\nMegaHunterCZ — 321\nShadowWolf — 299\nPixelSlayer — 250'
+  );
+  const extra2 = createTextTexture(
+    'Nejdelší série\n-----------------\nNoScopeNinja — 47\nLuckyShot — 39'
+  );
+
+  function createSimplePanel(texture, x, y, z, rotY) {
+    const geo = new THREE.PlaneGeometry(4, 2.5);
+    const mat = new THREE.MeshStandardMaterial({
+      map: texture,
+      metalness: 0.2,
+      roughness: 0.7
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, y, z);
+    mesh.rotation.y = rotY;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+    return mesh;
+  }
+
+  createSimplePanel(extra1, -roomWidth / 2 + 0.26, 3, -5, Math.PI / 2);
+  createSimplePanel(extra2, roomWidth / 2 - 0.26, 3, 5, -Math.PI / 2);
+
+  // ===== OVLÁDÁNÍ HRÁČE (POHYB + KOLIZE) =====
+  const controls = new PointerLockControls(camera, document.body);
+
+  const overlay = document.getElementById('overlay');
+  overlay.addEventListener('click', () => {
+    controls.lock();
+  });
+
+  controls.addEventListener('lock', () => {
+    overlay.style.display = 'none';
+  });
+
+  controls.addEventListener('unlock', () => {
+    overlay.style.display = 'flex';
+  });
+
+  scene.add(controls.getObject());
+
+  // Startovní pozice hráče
+  controls.getObject().position.set(0, 1.8, 10);
+
+  const velocity = new THREE.Vector3();
+  const direction = new THREE.Vector3();
+  const playerHeight = 1.8;
+  const moveSpeed = 10.0;
+  const gravity = 30.0;
+  const jumpSpeed = 10.0;
+  let canJump = false;
+
+  const keyStates = {};
+  document.addEventListener('keydown', (event) => {
+    keyStates[event.code] = true;
+  });
+  document.addEventListener('keyup', (event) => {
+    keyStates[event.code] = false;
+  });
+
+  function getForwardVector() {
+    camera.getWorldDirection(direction);
+    direction.y = 0;
+    direction.normalize();
+    return direction;
+  }
+
+  function getSideVector() {
+    camera.getWorldDirection(direction);
+    direction.y = 0;
+    direction.normalize();
+    direction.cross(camera.up);
+    return direction;
+  }
+
+  function handleMovement(delta) {
+    if (!controls.isLocked) return;
+
+    // Tlumení rychlosti
+    velocity.x -= velocity.x * 10.0 * delta;
+    velocity.z -= velocity.z * 10.0 * delta;
+
+    // Gravitace
+    velocity.y -= gravity * delta;
+
+    // Vstup z kláves
+    const forward = getForwardVector();
+    const side = getSideVector();
+
+    if (keyStates['KeyW']) {
+      velocity.addScaledVector(forward, moveSpeed * delta);
+    }
+    if (keyStates['KeyS']) {
+      velocity.addScaledVector(forward, -moveSpeed * delta);
+    }
+    if (keyStates['KeyA']) {
+      velocity.addScaledVector(side, -moveSpeed * delta);
+    }
+    if (keyStates['KeyD']) {
+      velocity.addScaledVector(side, moveSpeed * delta);
+    }
+
+    if (keyStates['Space'] && canJump) {
+      velocity.y = jumpSpeed;
+      canJump = false;
+    }
+
+    const oldPosition = controls.getObject().position.clone();
+    const newPosition = oldPosition.clone().addScaledVector(velocity, delta);
+
+    // Jednoduché kolize se stěnami (AABB)
+    const halfWidth = roomWidth / 2 - 0.6;
+    const halfDepth = roomDepth / 2 - 0.6;
+
+    if (newPosition.x < -halfWidth) newPosition.x = -halfWidth;
+    if (newPosition.x > halfWidth) newPosition.x = halfWidth;
+    if (newPosition.z < -halfDepth) newPosition.z = -halfDepth;
+    if (newPosition.z > halfDepth) newPosition.z = halfDepth;
+
+    // Podlaha
+    if (newPosition.y < playerHeight) {
+      velocity.y = 0;
+      newPosition.y = playerHeight;
+      canJump = true;
+    }
+
+    controls.getObject().position.copy(newPosition);
+  }
+
+  // ===== ANIMACE =====
+  const clock = new THREE.Clock();
+
+  function animate() {
+    requestAnimationFrame(animate);
+    const delta = clock.getDelta();
+    handleMovement(delta);
+    renderer.render(scene, camera);
+  }
+
+  animate();
+
+  // ===== RESIZE =====
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+</script>
+</body>
+</html>
