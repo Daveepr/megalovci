@@ -2,12 +2,12 @@
 <html lang="cs">
 <head>
   <meta charset="UTF-8">
-  <title>Síň megalovců 3D</title>
+  <title>Síň megalovců 3D – Galerie legend</title>
   <style>
     body {
       margin: 0;
       overflow: hidden;
-      font-family: sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background: #000;
       color: #fff;
     }
@@ -17,98 +17,137 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(0,0,0,0.8);
+      background: radial-gradient(circle at top, rgba(80,80,120,0.6), rgba(0,0,0,0.95));
       color: #fff;
       z-index: 10;
       cursor: pointer;
       flex-direction: column;
       text-align: center;
     }
+    #overlay h1 {
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-bottom: 0.4em;
+    }
+    #overlay p {
+      opacity: 0.85;
+      max-width: 480px;
+    }
     #info {
       position: fixed;
       top: 10px;
       left: 10px;
       z-index: 5;
-      background: rgba(0,0,0,0.5);
+      background: rgba(0,0,0,0.55);
       padding: 8px 12px;
       border-radius: 4px;
       font-size: 13px;
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255,255,255,0.08);
     }
   </style>
 </head>
 <body>
 <div id="overlay">
-  <h1>Síň megalovců 3D</h1>
-  <p>Klikni pro vstup, ovládání: WASD + myš, mezerník = skok</p>
+  <h1>SÍŇ MEGALOVCŮ</h1>
+  <p>Klikni pro vstup do galerie legend. Ovládání: WASD = pomalá chůze, myš = rozhlížení, Esc = kurzor.</p>
 </div>
 <div id="info">
-  WASD = pohyb, myš = rozhlížení, Esc = kurzor
+  Prohlídka: WASD = chůze, myš = rozhlížení
 </div>
 
 <script type="module">
-import * as THREE from './three.module.js';
-import { PointerLockControls } from './PointerLockControls.js';
-  // ===== ZÁKLAD SCÉNY =====
+  import * as THREE from './three.module.js';
+  import { PointerLockControls } from './PointerLockControls.js';
+
+  // ===== SCÉNA =====
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x050509);
+  scene.fog = new THREE.FogExp2(0x050509, 0.035);
 
   const camera = new THREE.PerspectiveCamera(
-    75,
+    70,
     window.innerWidth / window.innerHeight,
     0.1,
-    1000
+    200
   );
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   document.body.appendChild(renderer.domElement);
 
   // ===== SVĚTLA =====
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.25);
-  scene.add(ambientLight);
+  const hemiLight = new THREE.HemisphereLight(0x8899ff, 0x202020, 0.6);
+  scene.add(hemiLight);
 
-  const spotLight = new THREE.SpotLight(0xffffff, 1.2);
-  spotLight.position.set(0, 10, 0);
-  spotLight.angle = Math.PI / 4;
-  spotLight.penumbra = 0.3;
-  spotLight.decay = 1;
-  spotLight.distance = 50;
-  spotLight.castShadow = true;
-  scene.add(spotLight);
+  const mainSpot = new THREE.SpotLight(0xffffff, 1.2, 80, Math.PI / 4, 0.4, 1);
+  mainSpot.position.set(0, 12, 0);
+  mainSpot.castShadow = true;
+  scene.add(mainSpot);
 
-  // ===== MÍSTNOST (JEDNODUCHÁ HALA) =====
-  const roomWidth = 20;
-  const roomDepth = 30;
-  const roomHeight = 6;
+  // jemné barevné akcenty
+  const accentLeft = new THREE.PointLight(0x4466ff, 0.7, 30);
+  accentLeft.position.set(-8, 3, -8);
+  scene.add(accentLeft);
 
+  const accentRight = new THREE.PointLight(0xaa66ff, 0.7, 30);
+  accentRight.position.set(8, 3, -8);
+  scene.add(accentRight);
+
+  // ===== ROZMĚRY MÍSTNOSTI =====
+  const roomWidth = 22;
+  const roomDepth = 32;
+  const roomHeight = 8;
+
+  // ===== MATERIÁLY =====
   const wallMaterial = new THREE.MeshStandardMaterial({
-    color: 0x222233,
-    metalness: 0.1,
-    roughness: 0.8
+    color: 0x15151c,
+    metalness: 0.4,
+    roughness: 0.7
   });
 
   const floorMaterial = new THREE.MeshStandardMaterial({
-    color: 0x111111,
-    metalness: 0.2,
-    roughness: 0.9
+    color: 0x08080b,
+    metalness: 0.7,
+    roughness: 0.25
   });
 
-  // Podlaha
+  const trimEmissive = new THREE.MeshStandardMaterial({
+    color: 0x111122,
+    emissive: new THREE.Color(0x3355ff),
+    emissiveIntensity: 1.8,
+    metalness: 0.8,
+    roughness: 0.2
+  });
+
+  const trimEmissivePurple = new THREE.MeshStandardMaterial({
+    color: 0x111122,
+    emissive: new THREE.Color(0xaa55ff),
+    emissiveIntensity: 1.6,
+    metalness: 0.8,
+    roughness: 0.2
+  });
+
+  // ===== PODLAHA A STROP =====
   const floorGeo = new THREE.PlaneGeometry(roomWidth, roomDepth);
   const floor = new THREE.Mesh(floorGeo, floorMaterial);
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
   scene.add(floor);
 
-  // Strop
   const ceilingGeo = new THREE.PlaneGeometry(roomWidth, roomDepth);
   const ceiling = new THREE.Mesh(ceilingGeo, wallMaterial);
   ceiling.rotation.x = Math.PI / 2;
   ceiling.position.y = roomHeight;
+  ceiling.receiveShadow = true;
   scene.add(ceiling);
 
-  // Stěny
+  // ===== STĚNY =====
+  const colliders = [];
+
   function createWall(width, height, depth, x, y, z, rotY = 0) {
     const geo = new THREE.BoxGeometry(width, height, depth);
     const mesh = new THREE.Mesh(geo, wallMaterial);
@@ -121,18 +160,30 @@ import { PointerLockControls } from './PointerLockControls.js';
     return mesh;
   }
 
-  const colliders = [];
+  // zadní, přední, levá, pravá
+  createWall(roomWidth, roomHeight, 0.6, 0, roomHeight / 2, -roomDepth / 2);
+  createWall(roomWidth, roomHeight, 0.6, 0, roomHeight / 2, roomDepth / 2);
+  createWall(roomDepth, roomHeight, 0.6, -roomWidth / 2, roomHeight / 2, 0, Math.PI / 2);
+  createWall(roomDepth, roomHeight, 0.6, roomWidth / 2, roomHeight / 2, 0, Math.PI / 2);
 
-  // Zadní stěna
-  createWall(roomWidth, roomHeight, 0.5, 0, roomHeight / 2, -roomDepth / 2);
-  // Přední stěna
-  createWall(roomWidth, roomHeight, 0.5, 0, roomHeight / 2, roomDepth / 2);
-  // Levá stěna
-  createWall(roomDepth, roomHeight, 0.5, -roomWidth / 2, roomHeight / 2, 0, Math.PI / 2);
-  // Pravá stěna
-  createWall(roomDepth, roomHeight, 0.5, roomWidth / 2, roomHeight / 2, 0, Math.PI / 2);
+  // ===== SVĚTELNÉ LIŠTY (DEKOR) =====
+  function createTrim(x, y, z, w, h, d, material) {
+    const geo = new THREE.BoxGeometry(w, h, d);
+    const mesh = new THREE.Mesh(geo, material);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    scene.add(mesh);
+    return mesh;
+  }
 
-  // ===== „DATA Z NETU“ – MOCK ŽEBŘÍČKU =====
+  // podél podlahy
+  createTrim(0, 0.05, -roomDepth / 2 + 0.3, roomWidth, 0.1, 0.2, trimEmissive);
+  createTrim(0, 0.05, roomDepth / 2 - 0.3, roomWidth, 0.1, 0.2, trimEmissivePurple);
+  createTrim(-roomWidth / 2 + 0.3, 0.05, 0, roomDepth, 0.1, 0.2, trimEmissive);
+  createTrim(roomWidth / 2 - 0.3, 0.05, 0, roomDepth, 0.1, 0.2, trimEmissivePurple);
+
+  // ===== „DATA“ – MOCK ŽEBŘÍČKY =====
   const leaderboard = [
     { name: 'MegaHunterCZ', score: 98765 },
     { name: 'ShadowWolf', score: 87654 },
@@ -141,17 +192,27 @@ import { PointerLockControls } from './PointerLockControls.js';
     { name: 'LuckyShot', score: 54321 }
   ];
 
-  // ===== PANELY NA ZDI (ŽEBŘÍČEK) =====
-  const panelMaterial = new THREE.MeshStandardMaterial({
-    color: 0x333344,
-    metalness: 0.3,
-    roughness: 0.6
-  });
+  const hallOfFame = [
+    'Hall of Fame',
+    '-----------------',
+    'MegaHunterCZ – 12x #1',
+    'ShadowWolf – 9x top 3',
+    'PixelSlayer – 7x MVP'
+  ];
 
+  const streaks = [
+    'Nejdelší série',
+    '-----------------',
+    'NoScopeNinja – 47',
+    'LuckyShot – 39',
+    'ShadowWolf – 34'
+  ];
+
+  // ===== TEXTOVÉ PANELY =====
   const textCanvasCache = {};
 
-  function createTextTexture(text, width = 512, height = 256) {
-    const key = text;
+  function createTextTexture(lines, width = 512, height = 512) {
+    const key = lines.join('\n');
     if (textCanvasCache[key]) return textCanvasCache[key];
 
     const canvas = document.createElement('canvas');
@@ -159,74 +220,46 @@ import { PointerLockControls } from './PointerLockControls.js';
     canvas.height = height;
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#111122';
+    // pozadí panelu
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, '#111320');
+    gradient.addColorStop(1, '#05060b');
+    ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 
+    // rámeček
+    ctx.strokeStyle = 'rgba(180,180,255,0.5)';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(16, 16, width - 32, height - 32);
+
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 40px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
 
-    const lines = text.split('\n');
-    const lineHeight = 48;
-    let y = 30;
-    for (const line of lines) {
+    let y = 40;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      ctx.font = i === 0 ? 'bold 40px "Segoe UI", sans-serif' : '24px "Segoe UI", sans-serif';
       ctx.fillText(line, width / 2, y);
-      y += lineHeight;
+      y += i === 0 ? 52 : 34;
     }
 
     const texture = new THREE.CanvasTexture(canvas);
+    texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
     texture.needsUpdate = true;
     textCanvasCache[key] = texture;
     return texture;
   }
 
-  function createLeaderboardPanel(data, x, y, z, rotY) {
-    const panelGeo = new THREE.PlaneGeometry(6, 3);
-    const textLines = [
-      'Síň megalovců',
-      '-----------------',
-      ...data.map((d, i) => `${i + 1}. ${d.name} — ${d.score}`)
-    ];
-    const texture = createTextTexture(textLines.join('\n'));
+  function createPanel(lines, widthWorld, heightWorld, x, y, z, rotY) {
+    const geo = new THREE.PlaneGeometry(widthWorld, heightWorld);
+    const tex = createTextTexture(lines);
     const mat = new THREE.MeshStandardMaterial({
-      map: texture,
-      metalness: 0.2,
-      roughness: 0.7
-    });
-
-    const panel = new THREE.Mesh(panelGeo, mat);
-    panel.position.set(x, y, z);
-    panel.rotation.y = rotY;
-    panel.castShadow = true;
-    panel.receiveShadow = true;
-    scene.add(panel);
-    return panel;
-  }
-
-  // Panel na zadní stěně
-  createLeaderboardPanel(
-    leaderboard,
-    0,
-    3,
-    -roomDepth / 2 + 0.26,
-    0
-  );
-
-  // Další panely – třeba „Top headshots“, „Nejdelší série“
-  const extra1 = createTextTexture(
-    'Top headshots\n-----------------\nMegaHunterCZ — 321\nShadowWolf — 299\nPixelSlayer — 250'
-  );
-  const extra2 = createTextTexture(
-    'Nejdelší série\n-----------------\nNoScopeNinja — 47\nLuckyShot — 39'
-  );
-
-  function createSimplePanel(texture, x, y, z, rotY) {
-    const geo = new THREE.PlaneGeometry(4, 2.5);
-    const mat = new THREE.MeshStandardMaterial({
-      map: texture,
-      metalness: 0.2,
-      roughness: 0.7
+      map: tex,
+      metalness: 0.4,
+      roughness: 0.6,
+      emissive: new THREE.Color(0x111122),
+      emissiveIntensity: 0.4
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(x, y, z);
@@ -237,13 +270,110 @@ import { PointerLockControls } from './PointerLockControls.js';
     return mesh;
   }
 
-  createSimplePanel(extra1, -roomWidth / 2 + 0.26, 3, -5, Math.PI / 2);
-  createSimplePanel(extra2, roomWidth / 2 - 0.26, 3, 5, -Math.PI / 2);
+  // hlavní leaderboard panel – zadní stěna
+  const leaderboardLines = [
+    'Síň megalovců',
+    '-----------------',
+    ...leaderboard.map((d, i) => `${i + 1}. ${d.name} — ${d.score}`)
+  ];
+  createPanel(
+    leaderboardLines,
+    9,
+    5,
+    0,
+    4.2,
+    -roomDepth / 2 + 0.31,
+    0
+  );
 
-  // ===== OVLÁDÁNÍ HRÁČE (POHYB + KOLIZE) =====
+  // Hall of Fame – levá stěna
+  createPanel(
+    hallOfFame,
+    6,
+    4,
+    -roomWidth / 2 + 0.31,
+    4,
+    -6,
+    Math.PI / 2
+  );
+
+  // Nejdelší série – pravá stěna
+  createPanel(
+    streaks,
+    6,
+    4,
+    roomWidth / 2 - 0.31,
+    4,
+    -2,
+    -Math.PI / 2
+  );
+
+  // ===== TROFEJE / PODSTAVCE UPROSTŘED =====
+  const pedestalMat = new THREE.MeshStandardMaterial({
+    color: 0x181820,
+    metalness: 0.6,
+    roughness: 0.35
+  });
+
+  function createPedestal(x, z, height = 1.2) {
+    const geo = new THREE.CylinderGeometry(0.7, 0.9, height, 24);
+    const mesh = new THREE.Mesh(geo, pedestalMat);
+    mesh.position.set(x, height / 2, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+    return mesh;
+  }
+
+  function createTrophy(x, z, color) {
+    const geo = new THREE.SphereGeometry(0.45, 32, 32);
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: new THREE.Color(color),
+      emissiveIntensity: 1.8,
+      metalness: 0.9,
+      roughness: 0.15
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, 2.0, z);
+    mesh.castShadow = true;
+    scene.add(mesh);
+    return mesh;
+  }
+
+  const ped1 = createPedestal(-3, 0);
+  const ped2 = createPedestal(0, -3);
+  const ped3 = createPedestal(3, 0);
+
+  const trophy1 = createTrophy(-3, 0, 0xffd700); // zlatá
+  const trophy2 = createTrophy(0, -3, 0x44ddff);
+  const trophy3 = createTrophy(3, 0, 0xaa66ff);
+
+  // centrální „monument“ – světelný sloup
+  const monumentGeo = new THREE.CylinderGeometry(0.6, 0.6, 5.5, 32);
+  const monumentMat = new THREE.MeshStandardMaterial({
+    color: 0x111122,
+    emissive: new THREE.Color(0x4466ff),
+    emissiveIntensity: 1.4,
+    metalness: 0.9,
+    roughness: 0.1,
+    transparent: true,
+    opacity: 0.85
+  });
+  const monument = new THREE.Mesh(monumentGeo, monumentMat);
+  monument.position.set(0, 2.8, 0);
+  monument.castShadow = false;
+  monument.receiveShadow = false;
+  scene.add(monument);
+
+  const monumentLight = new THREE.PointLight(0x6688ff, 1.4, 18);
+  monumentLight.position.set(0, 4.5, 0);
+  scene.add(monumentLight);
+
+  // ===== OVLÁDÁNÍ – TOUR MÓD =====
   const controls = new PointerLockControls(camera, document.body);
-
   const overlay = document.getElementById('overlay');
+
   overlay.addEventListener('click', () => {
     controls.lock();
   });
@@ -258,92 +388,66 @@ import { PointerLockControls } from './PointerLockControls.js';
 
   scene.add(controls.getObject());
 
-  // Startovní pozice hráče
-  controls.getObject().position.set(0, 1.8, 10);
+  // startovní pozice – u vstupu
+  controls.getObject().position.set(0, 1.8, roomDepth / 2 - 4);
 
   const velocity = new THREE.Vector3();
-  const direction = new THREE.Vector3();
-  const playerHeight = 1.8;
-  const moveSpeed = 10.0;
-  const gravity = 30.0;
-  const jumpSpeed = 10.0;
-  let canJump = false;
-
   const keyStates = {};
-  document.addEventListener('keydown', (event) => {
-    keyStates[event.code] = true;
+  const moveSpeed = 4.0; // pomalá chůze
+
+  document.addEventListener('keydown', (e) => {
+    keyStates[e.code] = true;
   });
-  document.addEventListener('keyup', (event) => {
-    keyStates[event.code] = false;
+  document.addEventListener('keyup', (e) => {
+    keyStates[e.code] = false;
   });
 
   function getForwardVector() {
-    camera.getWorldDirection(direction);
-    direction.y = 0;
-    direction.normalize();
-    return direction;
+    const forward = new THREE.Vector3();
+    camera.getWorldDirection(forward);
+    forward.y = 0;
+    forward.normalize();
+    return forward;
   }
 
   function getSideVector() {
-    camera.getWorldDirection(direction);
-    direction.y = 0;
-    direction.normalize();
-    direction.cross(camera.up);
-    return direction;
+    const side = new THREE.Vector3();
+    camera.getWorldDirection(side);
+    side.y = 0;
+    side.normalize();
+    side.cross(camera.up);
+    return side;
   }
 
   function handleMovement(delta) {
     if (!controls.isLocked) return;
 
-    // Tlumení rychlosti
-    velocity.x -= velocity.x * 10.0 * delta;
-    velocity.z -= velocity.z * 10.0 * delta;
+    // jemné zpomalování – chůze, ne klouzání
+    velocity.x *= 0.85;
+    velocity.z *= 0.85;
 
-    // Gravitace
-    velocity.y -= gravity * delta;
-
-    // Vstup z kláves
     const forward = getForwardVector();
     const side = getSideVector();
 
-    if (keyStates['KeyW']) {
-      velocity.addScaledVector(forward, moveSpeed * delta);
-    }
-    if (keyStates['KeyS']) {
-      velocity.addScaledVector(forward, -moveSpeed * delta);
-    }
-    if (keyStates['KeyA']) {
-      velocity.addScaledVector(side, -moveSpeed * delta);
-    }
-    if (keyStates['KeyD']) {
-      velocity.addScaledVector(side, moveSpeed * delta);
-    }
+    if (keyStates['KeyW']) velocity.addScaledVector(forward, moveSpeed * delta);
+    if (keyStates['KeyS']) velocity.addScaledVector(forward, -moveSpeed * delta);
+    if (keyStates['KeyA']) velocity.addScaledVector(side, -moveSpeed * delta);
+    if (keyStates['KeyD']) velocity.addScaledVector(side, moveSpeed * delta);
 
-    if (keyStates['Space'] && canJump) {
-      velocity.y = jumpSpeed;
-      canJump = false;
-    }
+    const oldPos = controls.getObject().position.clone();
+    const newPos = oldPos.clone().addScaledVector(velocity, 1);
 
-    const oldPosition = controls.getObject().position.clone();
-    const newPosition = oldPosition.clone().addScaledVector(velocity, delta);
+    const halfWidth = roomWidth / 2 - 0.8;
+    const halfDepth = roomDepth / 2 - 0.8;
 
-    // Jednoduché kolize se stěnami (AABB)
-    const halfWidth = roomWidth / 2 - 0.6;
-    const halfDepth = roomDepth / 2 - 0.6;
+    if (newPos.x < -halfWidth) newPos.x = -halfWidth;
+    if (newPos.x > halfWidth) newPos.x = halfWidth;
+    if (newPos.z < -halfDepth) newPos.z = -halfDepth;
+    if (newPos.z > halfDepth) newPos.z = halfDepth;
 
-    if (newPosition.x < -halfWidth) newPosition.x = -halfWidth;
-    if (newPosition.x > halfWidth) newPosition.x = halfWidth;
-    if (newPosition.z < -halfDepth) newPosition.z = -halfDepth;
-    if (newPosition.z > halfDepth) newPosition.z = halfDepth;
+    newPos.y = 1.8; // žádná gravitace, fixní výška
 
-    // Podlaha
-    if (newPosition.y < playerHeight) {
-      velocity.y = 0;
-      newPosition.y = playerHeight;
-      canJump = true;
-    }
-
-    controls.getObject().position.copy(newPosition);
+    controls.getObject().position.copy(newPos);
   }
 
   // ===== ANIMACE =====
@@ -352,7 +456,16 @@ import { PointerLockControls } from './PointerLockControls.js';
   function animate() {
     requestAnimationFrame(animate);
     const delta = clock.getDelta();
+
     handleMovement(delta);
+
+    // jemná rotace trofejí a monumentu
+    const t = clock.getElapsedTime();
+    trophy1.rotation.y = t * 0.4;
+    trophy2.rotation.y = -t * 0.35;
+    trophy3.rotation.y = t * 0.5;
+    monument.rotation.y = t * 0.12;
+
     renderer.render(scene, camera);
   }
 
