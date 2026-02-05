@@ -101,23 +101,46 @@
   const roomDepth = 34;
   const roomHeight = 9;
 
-  // ===== MATERIÁLY =====
-  const wallMaterial = new THREE.MeshStandardMaterial({
-    color: 0x14141c,
-    metalness: 0.4,
-    roughness: 0.7
-  });
+  // ===== TEXTURY =====
+  const loader = new THREE.TextureLoader();
+
+  function setupTex(tex, repX, repY) {
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(repX, repY);
+    tex.minFilter = THREE.LinearMipMapLinearFilter;
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    return tex;
+  }
+
+  const floorTex = setupTex(
+    loader.load('https://ambientcg.com/get?file=Marble006_1K-JPG_Color.jpg'),
+    4, 4
+  );
+  const wallTex = setupTex(
+    loader.load('https://ambientcg.com/get?file=Concrete051_1K-JPG_Color.jpg'),
+    3, 2
+  );
+  const ceilingTex = setupTex(
+    loader.load('https://ambientcg.com/get?file=Metal034_1K-JPG_Color.jpg'),
+    3, 3
+  );
 
   const floorMaterial = new THREE.MeshStandardMaterial({
-    color: 0x050507,
-    metalness: 0.85,
-    roughness: 0.18
+    map: floorTex,
+    metalness: 0.8,
+    roughness: 0.25
   });
 
-  const tileMaterial = new THREE.MeshStandardMaterial({
-    color: 0x101015,
-    metalness: 0.6,
-    roughness: 0.4
+  const wallMaterial = new THREE.MeshStandardMaterial({
+    map: wallTex,
+    metalness: 0.3,
+    roughness: 0.8
+  });
+
+  const ceilingMaterial = new THREE.MeshStandardMaterial({
+    map: ceilingTex,
+    metalness: 0.4,
+    roughness: 0.6
   });
 
   const trimBlue = new THREE.MeshStandardMaterial({
@@ -143,9 +166,13 @@
   floor.receiveShadow = true;
   scene.add(floor);
 
-  // středová „dlažba“ – zvýrazněná cesta
   const centerTileGeo = new THREE.PlaneGeometry(roomWidth * 0.6, roomDepth * 0.6);
-  const centerTile = new THREE.Mesh(centerTileGeo, tileMaterial);
+  const centerTileMat = new THREE.MeshStandardMaterial({
+    color: 0x101015,
+    metalness: 0.6,
+    roughness: 0.4
+  });
+  const centerTile = new THREE.Mesh(centerTileGeo, centerTileMat);
   centerTile.rotation.x = -Math.PI / 2;
   centerTile.position.y = 0.01;
   centerTile.receiveShadow = true;
@@ -153,13 +180,12 @@
 
   // ===== STROP =====
   const ceilingGeo = new THREE.PlaneGeometry(roomWidth, roomDepth);
-  const ceiling = new THREE.Mesh(ceilingGeo, wallMaterial);
+  const ceiling = new THREE.Mesh(ceilingGeo, ceilingMaterial);
   ceiling.rotation.x = Math.PI / 2;
   ceiling.position.y = roomHeight;
   ceiling.receiveShadow = true;
   scene.add(ceiling);
 
-  // stropní světelné panely
   const ceilingPanelMat = new THREE.MeshStandardMaterial({
     color: 0x111118,
     emissive: new THREE.Color(0x334477),
@@ -172,7 +198,7 @@
     const geo = new THREE.PlaneGeometry(w, d);
     const mesh = new THREE.Mesh(geo, ceilingPanelMat);
     mesh.rotation.x = Math.PI / 2;
-    mesh.position.set(x, roomHeight - 0.01, z);
+    mesh.position.set(x, roomHeight - 0.02, z);
     scene.add(mesh);
     return mesh;
   }
@@ -181,8 +207,19 @@
   createCeilingPanel(0, -roomDepth * 0.2, roomWidth * 0.4, roomDepth * 0.18);
   createCeilingPanel(0, roomDepth * 0.2, roomWidth * 0.4, roomDepth * 0.18);
 
-  // ===== STĚNY + SLOUPY =====
+  // ===== KOLIZNÍ OBJEKTY =====
   const colliders = [];
+  const colliderBoxes = [];
+
+  function addCollider(mesh) {
+    colliders.push(mesh);
+    const box = new THREE.Box3().setFromObject(mesh);
+    colliderBoxes.push(box);
+  }
+
+  function updateColliderBox(index) {
+    colliderBoxes[index].setFromObject(colliders[index]);
+  }
 
   function createWall(width, height, depth, x, y, z, rotY = 0) {
     const geo = new THREE.BoxGeometry(width, height, depth);
@@ -192,7 +229,7 @@
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     scene.add(mesh);
-    colliders.push(mesh);
+    addCollider(mesh);
     return mesh;
   }
 
@@ -202,7 +239,6 @@
   createWall(roomDepth, roomHeight, 0.6, -roomWidth / 2, roomHeight / 2, 0, Math.PI / 2);
   createWall(roomDepth, roomHeight, 0.6, roomWidth / 2, roomHeight / 2, 0, Math.PI / 2);
 
-  // sloupy v rozích
   const pillarMat = new THREE.MeshStandardMaterial({
     color: 0x181820,
     metalness: 0.5,
@@ -216,7 +252,7 @@
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     scene.add(mesh);
-    colliders.push(mesh);
+    addCollider(mesh);
     return mesh;
   }
 
@@ -225,7 +261,6 @@
   createPillar(-roomWidth / 2 + 1, roomDepth / 2 - 1);
   createPillar(roomWidth / 2 - 1, roomDepth / 2 - 1);
 
-  // ===== SVĚTELNÉ LIŠTY =====
   function createTrim(x, y, z, w, h, d, material) {
     const geo = new THREE.BoxGeometry(w, h, d);
     const mesh = new THREE.Mesh(geo, material);
@@ -236,13 +271,12 @@
     return mesh;
   }
 
-  // podél podlahy
   createTrim(0, 0.05, -roomDepth / 2 + 0.3, roomWidth, 0.1, 0.2, trimBlue);
   createTrim(0, 0.05, roomDepth / 2 - 0.3, roomWidth, 0.1, 0.2, trimPurple);
   createTrim(-roomWidth / 2 + 0.3, 0.05, 0, roomDepth, 0.1, 0.2, trimBlue);
   createTrim(roomWidth / 2 - 0.3, 0.05, 0, roomDepth, 0.1, 0.2, trimPurple);
 
-  // ===== „DATA“ – MOCK ŽEBŘÍČKY =====
+  // ===== DATA =====
   const leaderboard = [
     { name: 'MegaHunterCZ', score: 98765 },
     { name: 'ShadowWolf', score: 87654 },
@@ -267,7 +301,7 @@
     'ShadowWolf – 34'
   ];
 
-  // ===== TEXTOVÉ PANELY =====
+  // ===== TEXT PANELY =====
   const textCanvasCache = {};
 
   function createTextTexture(lines, width = 512, height = 512) {
@@ -324,6 +358,7 @@
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     scene.add(mesh);
+    addCollider(mesh);
     return mesh;
   }
 
@@ -376,7 +411,7 @@
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     scene.add(mesh);
-    colliders.push(mesh);
+    addCollider(mesh);
     return mesh;
   }
 
@@ -396,9 +431,9 @@
     return mesh;
   }
 
-  const ped1 = createPedestal(-4, 1);
-  const ped2 = createPedestal(4, 1);
-  const ped3 = createPedestal(0, -5);
+  createPedestal(-4, 1);
+  createPedestal(4, 1);
+  createPedestal(0, -5);
 
   const trophy1 = createTrophy(-4, 1, 0xffd700);
   const trophy2 = createTrophy(4, 1, 0x44ddff);
@@ -417,9 +452,8 @@
   cauldron.castShadow = true;
   cauldron.receiveShadow = true;
   scene.add(cauldron);
-  colliders.push(cauldron);
+  addCollider(cauldron);
 
-  // „uhlíky“
   const emberGeo = new THREE.SphereGeometry(0.18, 16, 16);
   const emberMat = new THREE.MeshStandardMaterial({
     color: 0xffaa55,
@@ -444,7 +478,6 @@
     embers.push(m);
   }
 
-  // „plamen“ – jednoduchý sprite
   const flameMat = new THREE.SpriteMaterial({
     color: 0xffddaa,
     opacity: 0.9
@@ -476,7 +509,6 @@
 
   scene.add(controls.getObject());
 
-  // vyšší „postava“
   const playerHeight = 2.0;
   controls.getObject().position.set(0, playerHeight, roomDepth / 2 - 5);
 
@@ -508,6 +540,28 @@
     return side;
   }
 
+  function resolveCollisions(newPos) {
+    const playerRadius = 0.6;
+
+    for (let i = 0; i < colliderBoxes.length; i++) {
+      const box = colliderBoxes[i];
+
+      const closest = new THREE.Vector3(
+        THREE.MathUtils.clamp(newPos.x, box.min.x, box.max.x),
+        THREE.MathUtils.clamp(newPos.y, box.min.y, box.max.y),
+        THREE.MathUtils.clamp(newPos.z, box.min.z, box.max.z)
+      );
+
+      const dist = closest.distanceTo(newPos);
+
+      if (dist < playerRadius) {
+        const push = newPos.clone().sub(closest).setY(0).normalize();
+        const depth = playerRadius - dist;
+        newPos.addScaledVector(push, depth);
+      }
+    }
+  }
+
   function handleMovement(delta) {
     if (!controls.isLocked) return;
 
@@ -533,22 +587,7 @@
     if (newPos.z < -halfDepth) newPos.z = -halfDepth;
     if (newPos.z > halfDepth) newPos.z = halfDepth;
 
-    // jednoduché kolize s objekty (sphere vs. colliders AABB)
-    const playerRadius = 0.6;
-    for (const obj of colliders) {
-      const box = new THREE.Box3().setFromObject(obj);
-      const closestPoint = new THREE.Vector3(
-        THREE.MathUtils.clamp(newPos.x, box.min.x, box.max.x),
-        THREE.MathUtils.clamp(newPos.y, box.min.y, box.max.y),
-        THREE.MathUtils.clamp(newPos.z, box.min.z, box.max.z)
-      );
-      const dist = closestPoint.distanceTo(newPos);
-      if (dist < playerRadius) {
-        const pushDir = newPos.clone().sub(closestPoint).setY(0).normalize();
-        const penetration = playerRadius - dist;
-        newPos.addScaledVector(pushDir, penetration);
-      }
-    }
+    resolveCollisions(newPos);
 
     newPos.y = playerHeight;
     controls.getObject().position.copy(newPos);
@@ -568,7 +607,6 @@
     trophy2.rotation.y = -t * 0.35;
     trophy3.rotation.y = t * 0.5;
 
-    // jemná animace ohně
     flame.material.opacity = 0.8 + Math.sin(t * 6.0) * 0.15;
     flame.position.y = 1.4 + Math.sin(t * 3.0) * 0.05;
     fireLight.intensity = 1.6 + Math.sin(t * 8.0) * 0.3;
