@@ -90,7 +90,7 @@ function tex(path, repX, repY) {
   return t;
 }
 
-// opakování zvolené tak, aby nic nebylo natažené
+// opakování tak, aby nic nebylo natažené
 const texFloor  = tex('./grf/podlaha.jpg',   6, 6);
 const texWall   = tex('./grf/stena.jpg',     5, 3);
 const texBottom = tex('./grf/stenadole.jpg', 6, 2);
@@ -145,6 +145,13 @@ scene.add(cool);
 const floorGlow = new THREE.PointLight(0xffddaa, 0.4, 25);
 floorGlow.position.set(0, 1.0, 0);
 scene.add(floorGlow);
+
+/* ============================================================
+   ROOF LIGHT – světlo pro strop
+============================================================ */
+const roofLight = new THREE.PointLight(0xffffff, 0.0, 40);
+roofLight.position.set(0, roomHeight - 0.2, 0);
+scene.add(roofLight);
 
 /* ============================================================
    KOLIZNÍ SYSTÉM
@@ -251,25 +258,28 @@ controls.getObject().add(torchLight);
 ============================================================ */
 const lightPresets = {
   day: {
-    hemi: 0.9,
+    hemi: 1.0,
     main: 1.6,
     warm: 1.0,
     cool: 0.8,
-    ambient: 0.4
+    ambient: 0.4,
+    roof: 1.2
   },
   ambient: {
-    hemi: 0.4,
+    hemi: 0.5,
     main: 0.7,
     warm: 0.6,
     cool: 0.4,
-    ambient: 0.2
+    ambient: 0.2,
+    roof: 0.4
   },
   medieval: {
     hemi: 0.05,
     main: 0.0,
     warm: 0.0,
     cool: 0.0,
-    ambient: 0.0
+    ambient: 0.0,
+    roof: 0.0
   }
 };
 
@@ -283,6 +293,7 @@ function applyLightPreset(preset) {
     warm: warm.intensity,
     cool: cool.intensity,
     ambient: floorGlow.intensity,
+    roof: roofLight.intensity,
     torch: torchLight.intensity
   };
 
@@ -292,6 +303,7 @@ function applyLightPreset(preset) {
     warm: target.warm,
     cool: target.cool,
     ambient: target.ambient,
+    roof: target.roof,
     torch: preset === 'medieval' ? 1.4 : 0
   };
 
@@ -305,6 +317,7 @@ function applyLightPreset(preset) {
     warm.intensity      = start.warm   + (end.warm   - start.warm)   * k;
     cool.intensity      = start.cool   + (end.cool   - start.cool)   * k;
     floorGlow.intensity = start.ambient+ (end.ambient- start.ambient)* k;
+    roofLight.intensity = start.roof   + (end.roof   - start.roof)   * k;
     torchLight.intensity= start.torch  + (end.torch  - start.torch)  * k;
 
     if (k < 1) requestAnimationFrame(fade);
