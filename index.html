@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
   <meta charset="UTF-8">
-  <title>Síň megalovců 3D – Čistá místnost</title>
+  <title>Síň megalovců 3D – základní místnost</title>
   <style>
     body {
       margin: 0;
@@ -23,13 +23,27 @@
       flex-direction: column;
       text-align: center;
     }
+    #hint {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      padding: 6px 10px;
+      font-size: 13px;
+      color: #eee;
+      background: rgba(0,0,0,0.55);
+      border-radius: 4px;
+      z-index: 5;
+    }
   </style>
 </head>
 <body>
 
 <div id="overlay">
   <h1>SÍŇ MEGALOVCŮ</h1>
-  <p>Klikni pro vstup. Ovládání: WASD + myš</p>
+  <p>Klikni pro vstup. Ovládání: WASD + myš, 1/2/3 = světelné režimy</p>
+</div>
+<div id="hint">
+  WASD + myš • 1 = den • 2 = ambient • 3 = 13. století
 </div>
 
 <script type="module">
@@ -57,25 +71,6 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
 /* ============================================================
-   SVĚTLA – teplá galerijní atmosféra
-============================================================ */
-const hemi = new THREE.HemisphereLight(0xfff0d0, 0x201010, 0.55);
-scene.add(hemi);
-
-const mainSpot = new THREE.SpotLight(0xffffff, 1.3, 120, Math.PI/4, 0.4);
-mainSpot.position.set(0, 15, 0);
-mainSpot.castShadow = true;
-scene.add(mainSpot);
-
-const warm = new THREE.PointLight(0xffbb66, 0.8, 40);
-warm.position.set(-10, 5, -10);
-scene.add(warm);
-
-const cool = new THREE.PointLight(0x6688ff, 0.5, 40);
-cool.position.set(10, 5, -10);
-scene.add(cool);
-
-/* ============================================================
    ROZMĚRY MÍSTNOSTI
 ============================================================ */
 const roomWidth = 26;
@@ -83,7 +78,7 @@ const roomDepth = 32;
 const roomHeight = 9;
 
 /* ============================================================
-   TEXTURY (lokální, bez zvětšování)
+   TEXTURY
 ============================================================ */
 const loader = new THREE.TextureLoader();
 
@@ -95,10 +90,11 @@ function tex(path, repX, repY) {
   return t;
 }
 
-const texFloor  = tex('./grf/podlaha.jpg',   4, 4);
-const texWall   = tex('./grf/stena.jpg',     3, 2);
-const texBottom = tex('./grf/stenadole.jpg', 3, 1);
-const texCeil   = tex('./grf/strop.jpg',     3, 3);
+// opakování zvolené tak, aby nic nebylo natažené
+const texFloor  = tex('./grf/podlaha.jpg',   6, 6);
+const texWall   = tex('./grf/stena.jpg',     5, 3);
+const texBottom = tex('./grf/stenadole.jpg', 6, 2);
+const texCeil   = tex('./grf/strop.jpg',     4, 4);
 
 /* ============================================================
    MATERIÁLY
@@ -123,9 +119,32 @@ const matBottom = new THREE.MeshStandardMaterial({
 
 const matCeil = new THREE.MeshStandardMaterial({
   map: texCeil,
-  metalness: 0.2,
-  roughness: 0.6
+  metalness: 0.05,
+  roughness: 0.9
 });
+
+/* ============================================================
+   SVĚTLA – základní instance
+============================================================ */
+const hemi = new THREE.HemisphereLight(0xfff0d0, 0x201010, 0.6);
+scene.add(hemi);
+
+const mainSpot = new THREE.SpotLight(0xffffff, 1.3, 120, Math.PI/4, 0.4);
+mainSpot.position.set(0, 15, 0);
+mainSpot.castShadow = true;
+scene.add(mainSpot);
+
+const warm = new THREE.PointLight(0xffbb66, 0.8, 40);
+warm.position.set(-10, 5, -10);
+scene.add(warm);
+
+const cool = new THREE.PointLight(0x6688ff, 0.5, 40);
+cool.position.set(10, 5, -10);
+scene.add(cool);
+
+const floorGlow = new THREE.PointLight(0xffddaa, 0.4, 25);
+floorGlow.position.set(0, 1.0, 0);
+scene.add(floorGlow);
 
 /* ============================================================
    KOLIZNÍ SYSTÉM
@@ -168,10 +187,10 @@ ceiling.receiveShadow = true;
 scene.add(ceiling);
 
 /* ============================================================
-   STĚNY – varianta 1 (dvě části: spodní lem + horní tapeta)
+   STĚNY – dvě části: spodní lem + horní tapeta
 ============================================================ */
 function createWall(width, height, depth, x, y, z, rotY = 0) {
-  const bottomH = height * 0.13;
+  const bottomH = height * 0.10;
   const topH = height - bottomH;
 
   // spodní lem
@@ -211,19 +230,111 @@ updateColliders();
    OVLÁDÁNÍ – PointerLock
 ============================================================ */
 const controls = new PointerLockControls(camera, document.body);
-document.getElementById('overlay').addEventListener('click', () => controls.lock());
-controls.addEventListener('lock', () => document.getElementById('overlay').style.display = 'none');
-controls.addEventListener('unlock', () => document.getElementById('overlay').style.display = 'flex');
-scene.add(controls.getObject());
+const overlay = document.getElementById('overlay');
 
+overlay.addEventListener('click', () => controls.lock());
+controls.addEventListener('lock', () => overlay.style.display = 'none');
+controls.addEventListener('unlock', () => overlay.style.display = 'flex');
+
+scene.add(controls.getObject());
 controls.getObject().position.set(0, 2, roomDepth/2 - 5);
 
-const velocity = new THREE.Vector3();
-const key = {};
-const speed = 4.0;
+/* ============================================================
+   LOUČ – světlo u hráče (pro režim 3)
+============================================================ */
+const torchLight = new THREE.PointLight(0xffaa55, 0, 10);
+torchLight.position.set(0, 1.8, 0);
+controls.getObject().add(torchLight);
 
-document.addEventListener('keydown', e => key[e.code] = true);
-document.addEventListener('keyup',   e => key[e.code] = false);
+/* ============================================================
+   SVĚTELNÉ PRESETY
+============================================================ */
+const lightPresets = {
+  day: {
+    hemi: 0.9,
+    main: 1.6,
+    warm: 1.0,
+    cool: 0.8,
+    ambient: 0.4
+  },
+  ambient: {
+    hemi: 0.4,
+    main: 0.7,
+    warm: 0.6,
+    cool: 0.4,
+    ambient: 0.2
+  },
+  medieval: {
+    hemi: 0.05,
+    main: 0.0,
+    warm: 0.0,
+    cool: 0.0,
+    ambient: 0.0
+  }
+};
+
+function applyLightPreset(preset) {
+  const target = lightPresets[preset];
+  const duration = 0.6;
+
+  const start = {
+    hemi: hemi.intensity,
+    main: mainSpot.intensity,
+    warm: warm.intensity,
+    cool: cool.intensity,
+    ambient: floorGlow.intensity,
+    torch: torchLight.intensity
+  };
+
+  const end = {
+    hemi: target.hemi,
+    main: target.main,
+    warm: target.warm,
+    cool: target.cool,
+    ambient: target.ambient,
+    torch: preset === 'medieval' ? 1.4 : 0
+  };
+
+  let t = 0;
+  function fade() {
+    t += 0.02;
+    const k = Math.min(t / duration, 1);
+
+    hemi.intensity      = start.hemi   + (end.hemi   - start.hemi)   * k;
+    mainSpot.intensity  = start.main   + (end.main   - start.main)   * k;
+    warm.intensity      = start.warm   + (end.warm   - start.warm)   * k;
+    cool.intensity      = start.cool   + (end.cool   - start.cool)   * k;
+    floorGlow.intensity = start.ambient+ (end.ambient- start.ambient)* k;
+    torchLight.intensity= start.torch  + (end.torch  - start.torch)  * k;
+
+    if (k < 1) requestAnimationFrame(fade);
+  }
+  fade();
+}
+
+// výchozí režim – ambient
+applyLightPreset('ambient');
+
+/* ============================================================
+   OVLÁDÁNÍ KLAEVSAMI – přepínání světel
+============================================================ */
+const key = {};
+document.addEventListener('keydown', (e) => {
+  key[e.code] = true;
+
+  if (e.code === 'Digit1') applyLightPreset('day');
+  if (e.code === 'Digit2') applyLightPreset('ambient');
+  if (e.code === 'Digit3') applyLightPreset('medieval');
+});
+document.addEventListener('keyup', (e) => {
+  key[e.code] = false;
+});
+
+/* ============================================================
+   POHYB HRÁČE
+============================================================ */
+const velocity = new THREE.Vector3();
+const speed = 4.0;
 
 function forwardVec() {
   const v = new THREE.Vector3();
@@ -300,7 +411,8 @@ const clock = new THREE.Clock();
 
 function animate() {
   requestAnimationFrame(animate);
-  move(clock.getDelta());
+  const delta = clock.getDelta();
+  move(delta);
   renderer.render(scene, camera);
 }
 animate();
