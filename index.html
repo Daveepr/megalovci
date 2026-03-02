@@ -212,11 +212,13 @@ function createWall(width, height, depth, x, y, z, rotY = 0) {
   const bottomH = height * 0.10;
   const topH = height - bottomH;
 
-  /* === SPODNÍ LEM (UV FIX) === */
+  /* === SPODNÍ LEM (UV FIX – realistické cihly) === */
   const geoBottom = new THREE.BoxGeometry(width, bottomH, depth);
   const uvB = geoBottom.attributes.uv;
-  const repBX = width / 0.0;
-  const repBY = bottomH / 0.2;
+
+  // realistické cihly – poměr 8:1, cca 14 řad
+  const repBY = 14;          // počet řad cihel na výšku
+  const repBX = repBY * 8;   // poměr stran → dlouhé cihly
 
   for (let i = 0; i < uvB.count; i++) {
     const u = uvB.getX(i);
@@ -232,11 +234,13 @@ function createWall(width, height, depth, x, y, z, rotY = 0) {
   scene.add(bottom);
   addCollider(bottom);
 
-  /* === HORNÍ ČÁST (UV FIX) === */
+  /* === HORNÍ ČÁST (UV FIX – jemná omítka/tapeta) === */
   const geoTop = new THREE.BoxGeometry(width, topH, depth);
   const uvT = geoTop.attributes.uv;
-  const repTX = width / 1;
-  const repTY = topH / 3;
+
+  // jemné opakování, aby textura nebyla natažená
+  const repTY = 3;
+  const repTX = 6;
 
   for (let i = 0; i < uvT.count; i++) {
     const u = uvT.getX(i);
@@ -252,7 +256,6 @@ function createWall(width, height, depth, x, y, z, rotY = 0) {
   scene.add(top);
   addCollider(top);
 }
-
 /* === OBVODOVÉ STĚNY === */
 createWall(roomWidth, roomHeight, 0.6, 0, roomHeight/2, -roomDepth/2);
 createWall(roomWidth, roomHeight, 0.6, 0, roomHeight/2,  roomDepth/2);
@@ -473,6 +476,7 @@ window.addEventListener('resize', () => {
 </script>
 </body>
 </html>
+
 
 
 
