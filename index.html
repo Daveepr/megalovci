@@ -63,7 +63,23 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   200
 );
+/* ============================================================
+   ZOOM KOLEČKEM / PINCH
+============================================================ */
+let targetFov = camera.fov;
+const minFov = 35;   // přiblížení
+const maxFov = 90;   // oddálení
+const zoomSpeed = 0.08;
 
+function onZoom(e) {
+  e.preventDefault(); // nutné pro pinch na touchpadu
+
+  targetFov += e.deltaY * zoomSpeed;
+  targetFov = THREE.MathUtils.clamp(targetFov, minFov, maxFov);
+}
+
+document.addEventListener('wheel', onZoom, { passive: false });
+  
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
@@ -437,12 +453,14 @@ function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
   move(delta);
-  renderer.render(scene, camera);
-}
-animate();
 camera.fov += (targetFov - camera.fov) * 0.15;
 camera.fov = THREE.MathUtils.clamp(camera.fov, minFov, maxFov);
 camera.updateProjectionMatrix();
+  
+  renderer.render(scene, camera);
+}
+animate();
+
 /* ============================================================
    RESIZE
 ============================================================ */
@@ -451,27 +469,10 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
-
  
-/* ============================================================
-   ZOOM KOLEČKEM / PINCH
-============================================================ */
-let targetFov = camera.fov;
-const minFov = 35;   // přiblížení
-const maxFov = 90;   // oddálení
-const zoomSpeed = 0.08;
-
-function onZoom(e) {
-  e.preventDefault(); // nutné pro pinch na touchpadu
-
-  targetFov += e.deltaY * zoomSpeed;
-  targetFov = THREE.MathUtils.clamp(targetFov, minFov, maxFov);
-}
-
-document.addEventListener('wheel', onZoom, { passive: false });
-  
 </script>
 </body>
 </html>
+
 
 
