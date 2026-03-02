@@ -90,7 +90,6 @@ function tex(path, repX, repY) {
   return t;
 }
 
-// opakování tak, aby nic nebylo natažené
 const texFloor  = tex('./grf/podlaha.jpg',   6, 6);
 const texWall   = tex('./grf/stena.jpg',     5, 3);
 const texBottom = tex('./grf/stenadole.jpg', 6, 2);
@@ -124,7 +123,7 @@ const matCeil = new THREE.MeshStandardMaterial({
 });
 
 /* ============================================================
-   SVĚTLA – základní instance
+   SVĚTLA
 ============================================================ */
 const hemi = new THREE.HemisphereLight(0xfff0d0, 0x201010, 0.6);
 scene.add(hemi);
@@ -146,15 +145,12 @@ const floorGlow = new THREE.PointLight(0xffddaa, 0.4, 25);
 floorGlow.position.set(0, 1.0, 0);
 scene.add(floorGlow);
 
-/* ============================================================
-   ROOF LIGHT – světlo pro strop
-============================================================ */
 const roofLight = new THREE.PointLight(0xffffff, 0.0, 40);
 roofLight.position.set(0, roomHeight - 0.2, 0);
 scene.add(roofLight);
 
 /* ============================================================
-   KOLIZNÍ SYSTÉM
+   KOLIZE
 ============================================================ */
 const colliders = [];
 const colliderBoxes = [];
@@ -194,17 +190,25 @@ ceiling.receiveShadow = true;
 scene.add(ceiling);
 
 /* ============================================================
-   STĚNY – dvě části: spodní lem + horní tapeta
+   STĚNY – UV opravené
 ============================================================ */
 function createWall(width, height, depth, x, y, z, rotY = 0) {
   const bottomH = height * 0.10;
   const topH = height - bottomH;
 
-  // spodní lem
-  const bottom = new THREE.Mesh(
-    new THREE.BoxGeometry(width, bottomH, depth),
-    matBottom
-  );
+  /* === SPODNÍ LEM (UV FIX) === */
+  const geoBottom = new THREE.BoxGeometry(width, bottomH, depth);
+  const uvB = geoBottom.attributes.uv;
+  const repBX = width / 1.2;
+  const repBY = bottomH / 0.3;
+
+  for (let i = 0; i < uvB.count; i++) {
+    const u = uvB.getX(i);
+    const v = uvB.getY(i);
+    uvB.setXY(i, u * repBX, v * repBY);
+  }
+
+  const bottom = new THREE.Mesh(geoBottom, matBottom);
   bottom.position.set(x, y - topH/2, z);
   bottom.rotation.y = rotY;
   bottom.castShadow = true;
@@ -212,11 +216,19 @@ function createWall(width, height, depth, x, y, z, rotY = 0) {
   scene.add(bottom);
   addCollider(bottom);
 
-  // horní tapeta
-  const top = new THREE.Mesh(
-    new THREE.BoxGeometry(width, topH, depth),
-    matWall
-  );
+  /* === HORNÍ ČÁST (UV FIX) === */
+  const geoTop = new THREE.BoxGeometry(width, topH, depth);
+  const uvT = geoTop.attributes.uv;
+  const repTX = width / 2.5;
+  const repTY = topH / 2.5;
+
+  for (let i = 0; i < uvT.count; i++) {
+    const u = uvT.getX(i);
+    const v = uvT.getY(i);
+    uvT.setXY(i, u * repTX, v * repTY);
+  }
+
+  const top = new THREE.Mesh(geoTop, matWall);
   top.position.set(x, y + bottomH/2, z);
   top.rotation.y = rotY;
   top.castShadow = true;
@@ -225,7 +237,7 @@ function createWall(width, height, depth, x, y, z, rotY = 0) {
   addCollider(top);
 }
 
-// obvod
+/* === OBVODOVÉ STĚNY === */
 createWall(roomWidth, roomHeight, 0.6, 0, roomHeight/2, -roomDepth/2);
 createWall(roomWidth, roomHeight, 0.6, 0, roomHeight/2,  roomDepth/2);
 createWall(roomDepth, roomHeight, 0.6, -roomWidth/2, roomHeight/2, 0, Math.PI/2);
@@ -234,7 +246,7 @@ createWall(roomDepth, roomHeight, 0.6,  roomWidth/2, roomHeight/2, 0, Math.PI/2)
 updateColliders();
 
 /* ============================================================
-   OVLÁDÁNÍ – PointerLock
+   POINTER LOCK
 ============================================================ */
 const controls = new PointerLockControls(camera, document.body);
 const overlay = document.getElementById('overlay');
@@ -247,7 +259,7 @@ scene.add(controls.getObject());
 controls.getObject().position.set(0, 2, roomDepth/2 - 5);
 
 /* ============================================================
-   LOUČ – světlo u hráče (pro režim 3)
+   LOUČ
 ============================================================ */
 const torchLight = new THREE.PointLight(0xffaa55, 0, 10);
 torchLight.position.set(0, 1.8, 0);
@@ -325,11 +337,10 @@ function applyLightPreset(preset) {
   fade();
 }
 
-// výchozí režim – ambient
 applyLightPreset('ambient');
 
 /* ============================================================
-   OVLÁDÁNÍ KLAEVSAMI – přepínání světel
+   OVLÁDÁNÍ KLAEVSAMI
 ============================================================ */
 const key = {};
 document.addEventListener('keydown', (e) => {
