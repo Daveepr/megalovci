@@ -215,7 +215,7 @@ function createWall(width, height, depth, x, y, z, rotY = 0) {
   /* === SPODNÍ LEM (UV FIX) === */
   const geoBottom = new THREE.BoxGeometry(width, bottomH, depth);
   const uvB = geoBottom.attributes.uv;
-  const repBX = width / 3.0;
+  const repBX = width / 0.0;
   const repBY = bottomH / 0.2;
 
   for (let i = 0; i < uvB.count; i++) {
@@ -235,7 +235,7 @@ function createWall(width, height, depth, x, y, z, rotY = 0) {
   /* === HORNÍ ČÁST (UV FIX) === */
   const geoTop = new THREE.BoxGeometry(width, topH, depth);
   const uvT = geoTop.attributes.uv;
-  const repTX = width / 4;
+  const repTX = width / 1;
   const repTY = topH / 3;
 
   for (let i = 0; i < uvT.count; i++) {
@@ -473,6 +473,7 @@ window.addEventListener('resize', () => {
 </script>
 </body>
 </html>
+
 
 
 
